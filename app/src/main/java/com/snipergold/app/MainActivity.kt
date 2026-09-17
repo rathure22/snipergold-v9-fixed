@@ -14,8 +14,6 @@ import com.snipergold.app.ui.screens.MainScreen
 import com.snipergold.app.ui.theme.DarkBg
 import com.snipergold.app.ui.theme.SniperGoldTheme
 
-// KRITIKAL: Husto nga package com.snipergold.app - dili com.snipergold.v9
-// Kung v9 ang package, mag-crash ang app kay wala sa Manifest
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,7 +21,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val vm: MainViewModel = viewModel()
             SniperGoldTheme(accentTheme = vm.accentTheme) {
-                Surface(modifier = Modifier.fillMaxSize(), color = DarkBg) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = DarkBg
+                ) {
                     AdaptiveShell {
                         MainScreen(vm)
                     }
