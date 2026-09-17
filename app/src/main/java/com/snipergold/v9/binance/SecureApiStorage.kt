@@ -7,9 +7,7 @@ import androidx.security.crypto.MasterKey
 import org.json.JSONArray
 import org.json.JSONObject
 
-// --- SECURE API STORAGE - SAVE LANG PARA DILI MAKALIMOT ---
 object SecureApiStorage {
-    
     private fun getPrefs(context: Context) = EncryptedSharedPreferences.create(
         context,
         "sniper_gold_keys_v9",
@@ -18,7 +16,6 @@ object SecureApiStorage {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    // SAVE - magpabilin bisan i-close
     fun saveKeys(context: Context, goldApiKey: String, binanceKey: String, binanceSecret: String, lot: Double = 0.02) {
         getPrefs(context).edit()
             .putString("gold_api_key", goldApiKey)
@@ -28,13 +25,12 @@ object SecureApiStorage {
             .apply()
     }
 
-    // LOAD - auto load pag abli
     fun loadKeys(context: Context): Triple<String, String, String> {
         val p = getPrefs(context)
         return Triple(
-            p.getString("gold_api_key","")!!,
-            p.getString("binance_api_key","")!!,
-            p.getString("binance_secret","")!!
+            p.getString("gold_api_key","") ?: "",
+            p.getString("binance_api_key","") ?: "",
+            p.getString("binance_secret","") ?: ""
         )
     }
     
@@ -47,21 +43,19 @@ object SecureApiStorage {
     }
 }
 
-// --- TRADE HISTORY DATA ---
 data class TradeHistoryItem(
     val timestamp: Long,
-    val symbol: String, // XAU/USDT
-    val side: String, // BUY or SELL
+    val symbol: String,
+    val side: String,
     val entry: Double,
     val sl: Double,
     val tp1: Double,
     val tp2: Double,
-    val lot: Double, // 0.01, 0.02, 0.03
-    val status: String, // REAL - BINANCE, DEMO, etc
+    val lot: Double,
+    val status: String,
     val orderId: String = ""
 )
 
-// --- HISTORY STORAGE - AUTOMATIC REAL BUY/SELL LOG ---
 object TradeHistoryStorage {
     private const val PREF_NAME = "trade_history_prefs"
     private const val KEY_HISTORY = "history_json"
@@ -69,9 +63,7 @@ object TradeHistoryStorage {
     fun saveTrade(context: Context, trade: TradeHistoryItem) {
         val history = loadHistory(context).toMutableList()
         history.add(trade)
-        // Keep last 100 trades lang para dili bug-at
         if (history.size > 100) history.removeAt(0)
-        
         val jsonArray = JSONArray()
         history.forEach { t ->
             val obj = JSONObject()
@@ -112,21 +104,5 @@ object TradeHistoryStorage {
                 )
             }
         } catch (e: Exception) { emptyList() }
-    }
-    
-    fun clearHistory(context: Context) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .edit().remove(KEY_HISTORY).apply()
-    }
-}
-
-// --- BINANCE MANAGER - REAL TRADE ---
-object BinanceManager {
-    // Kung mag SELL/BUY ka, gamit ang lot nga gipili (0.01, 0.02, 0.03)
-    fun calculateQuantity(lot: Double): Double {
-        // XAUUSDT lot conversion
-        // 0.01 lot = 0.01 * 1 = 0.01 qty sa gold
-        // Pwede nimo i-adjust depende sa Binance minimum
-        return lot
     }
 }
