@@ -1,5 +1,7 @@
 package com.snipergold.app
 
+import kotlin.math.abs
+
 enum class SignalType { BUY, SELL, WAIT }
 
 enum class Sensitivity { STRICT, NORMAL, LOOSE }
@@ -27,9 +29,9 @@ class SignalEngine {
         slBuffer: Double = 0.50
     ): TradeSignal {
 
-        val distanceToSupport = kotlin.math.abs(currentPrice - supportPrice)
-        val distanceToResistance = kotlin.math.abs(currentPrice - resistancePrice)
-        
+        val distanceToSupport = abs(currentPrice - supportPrice)
+        val distanceToResistance = abs(currentPrice - resistancePrice)
+
         // Paspas o higpit nga distansya depende sa Sensitivity
         val maxDistance = when (sensitivity) {
             Sensitivity.STRICT -> 1.00
@@ -44,16 +46,16 @@ class SignalEngine {
         val (buyRsiLimit, sellRsiLimit) = when (sensitivity) {
             Sensitivity.STRICT -> Pair(30.0, 70.0)
             Sensitivity.NORMAL -> Pair(45.0, 55.0)
-            Sensitivity.LOOSE -> Pair(60.0, 40.0) // Mas luag ang pasok sa loose
+            Sensitivity.LOOSE -> Pair(60.0, 40.0)
         }
 
-        // 1. LOOSE / INSTANT MODE (Kung Loose ang pinili)
+        // 1. LOOSE / INSTANT MODE
         if (sensitivity == Sensitivity.LOOSE) {
             val isUptrend = rsi < 50.0
             val type = if (isUptrend) SignalType.BUY else SignalType.SELL
             val sl = if (type == SignalType.BUY) supportPrice - slBuffer else resistancePrice + slBuffer
-            val risk = kotlin.math.abs(currentPrice - sl)
-            
+            val risk = abs(currentPrice - sl)
+
             if (risk > 0) {
                 return TradeSignal(
                     type = type,
@@ -109,7 +111,7 @@ class SignalEngine {
             }
         }
 
-        // 4. WAIT Logic (Kung walay nasabtan nga kondisyon)
+        // 4. WAIT Logic
         return TradeSignal(
             type = SignalType.WAIT,
             entry = currentPrice,
@@ -131,7 +133,7 @@ class SignalEngine {
                 losses.add(0.0)
             } else {
                 gains.add(0.0)
-                losses.add(kotlin.math.abs(change))
+                losses.add(abs(change))
             }
         }
 
