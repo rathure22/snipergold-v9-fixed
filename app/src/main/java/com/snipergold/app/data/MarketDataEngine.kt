@@ -9,10 +9,17 @@ import java.util.concurrent.TimeUnit
 
 class MarketDataEngine {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .build()
+    companion object {
+        // Shared OkHttpClient para dili mag-usik og RAM sa cellphone
+        private val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(8, TimeUnit.SECONDS)
+                .readTimeout(8, TimeUnit.SECONDS)
+                .build()
+        }
+    }
+
+    private val client = sharedClient
 
     var source: String = "gold-api.com"
         private set
@@ -20,7 +27,6 @@ class MarketDataEngine {
     var lastHistoryCount: Int = 0
         private set
 
-    // Optional keys (can be set from UI / SharedPreferences)
     var siftingKey: String = ""
     var goldApiKey: String = ""
 
@@ -119,43 +125,45 @@ class MarketDataEngine {
     }
 
     suspend fun loadHistory(): List<Candle> = withContext(Dispatchers.IO) {
-        if (siftingKey.isBlank()) throw Exception("SiftingIO key required for history")
-        val url = "https://api.sifting.io/v1/hist/commodities/XAUUSD/bars?interval=1m&limit=180"
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("X-API-Key", siftingKey)
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw Exception("History ${resp.code}")
-            val body = resp.body?.string() ?: throw Exception("empty")
-            val json = JSONObject(body)
-            val arr = when {
-                json.has("data") -> json.getJSONArray("data")
-                json.has("bars") -> json.getJSONArray("bars")
-                else -> throw Exception("No bars")
-            }
-            val list = mutableListOf<Candle>()
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                val t = o.optLong("t", o.optLong("time", o.optLong("timestamp", 0)))
-                val open = o.optDouble("open", Double.NaN)
-                val high = o.optDouble("high", Double.NaN)
-                val low = o.optDouble("low", Double.NaN)
-                val close = o.optDouble("close", Double.NaN)
-                if (listOf(open, high, low, close).all { it.isFinite() }) {
-                    list.add(Candle(t, open, high, low, close, o.optDouble("v", 0.0)))
+        if (siftingKey.isBlank()) return@withContext emptyList()
+        try {
+            val url = "https://api.sifting.io/v1/hist/commodities/XAUUSD/bars?interval=1m&limit=180"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("X-API-Key", siftingKey)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                val body = resp.body?.string() ?: return@withContext emptyList()
+                val json = JSONObject(body)
+                val arr = when {
+                    json.has("data") -> json.getJSONArray("data")
+                    json.has("bars") -> json.getJSONArray("bars")
+                    else -> return@withContext emptyList()
                 }
+                val list = mutableListOf<Candle>()
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val t = o.optLong("t", o.optLong("time", o.optLong("timestamp", 0)))
+                    val open = o.optDouble("open", Double.NaN)
+                    val high = o.optDouble("high", Double.NaN)
+                    val low = o.optDouble("low", Double.NaN)
+                    val close = o.optDouble("close", Double.NaN)
+                    if (listOf(open, high, low, close).all { it.isFinite() }) {
+                        list.add(Candle(t, open, high, low, close, o.optDouble("v", 0.0)))
+                    }
+                }
+                lastHistoryCount = list.size
+                source = "SiftingIO"
+                list.takeLast(180)
             }
-            lastHistoryCount = list.size
-            source = "SiftingIO"
-            list.takeLast(180)
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
-
-    /** Public FX rates → PHP (auto update). Fallback static if offline. */
     suspend fun fetchForexRates(): List<ForexRate> = withContext(Dispatchers.IO) {
-        // 1. Unang priority: open.er-api.com (walay key, naay TINUOD nga KWD data — 161 currencies)
+        // 1. Unang priority: open.er-api.com
         try {
             val req = Request.Builder()
                 .url("https://open.er-api.com/v6/latest/USD")
@@ -179,7 +187,7 @@ class MarketDataEngine {
             }
         } catch (_: Exception) {}
 
-        // 2. Fallback: frankfurter.app (ECB — walay KWD, gi-estimate na lang)
+        // 2. Fallback: frankfurter.app
         try {
             val req = Request.Builder()
                 .url("https://api.frankfurter.app/latest?from=USD&to=PHP,EUR")
@@ -192,7 +200,7 @@ class MarketDataEngine {
                 val usdPhp = rates.optDouble("PHP", 62.91)
                 val eurPerUsd = rates.optDouble("EUR", 0.92)
                 val eurPhp = if (eurPerUsd > 0) usdPhp / eurPerUsd else 72.60
-                val kwdPhp = usdPhp * 3.25 // estimate — walay KWD sa ECB/frankfurter
+                val kwdPhp = usdPhp * 3.25
                 return@withContext listOf(
                     ForexRate("USD→PHP", usdPhp),
                     ForexRate("EUR→PHP", eurPhp),
