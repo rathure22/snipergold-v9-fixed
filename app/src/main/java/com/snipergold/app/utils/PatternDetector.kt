@@ -2,6 +2,7 @@ package com.snipergold.app.utils
 
 import com.snipergold.app.data.PatternResult
 import com.snipergold.app.data.Patterns
+import java.util.Locale
 import kotlin.math.abs
 
 object PatternDetector {
@@ -47,11 +48,11 @@ object PatternDetector {
         return Patterns(
             doubleBottom = PatternResult(
                 db, if (db) 90 else lows.size * 20,
-                if (db) "W @ ${"%.2f".format(lows.last())}" else "${lows.size} lows"
+                if (db) "W @ ${String.format(Locale.US, "%.2f", lows.last())}" else "${lows.size} lows"
             ),
             doubleTop = PatternResult(
                 dt, if (dt) 90 else highs.size * 20,
-                if (dt) "M @ ${"%.2f".format(highs.last())}" else "${highs.size} highs"
+                if (dt) "M @ ${String.format(Locale.US, "%.2f", highs.last())}" else "${highs.size} highs"
             ),
             bullFlag = PatternResult(bullFlag, if (bullFlag) 75 else 20, if (bullFlag) "Bull flag" else "No flag"),
             bearFlag = PatternResult(bearFlag, if (bearFlag) 75 else 20, if (bearFlag) "Bear flag" else "No flag"),
@@ -62,15 +63,11 @@ object PatternDetector {
         )
     }
 
-    /**
-     * Zigzag swing-point extraction: collapses the raw price series into a sequence of
-     * alternating swing highs and lows, filtering out moves smaller than [minMovePct].
-     */
     private fun findSwingPoints(prices: List<Double>, minMovePct: Double = 0.15): List<Double> {
         if (prices.size < 5) return emptyList()
         val pivots = mutableListOf<Double>()
         var anchor = prices[0]
-        var direction = 0 // 0 = undetermined, 1 = rising, -1 = falling
+        var direction = 0
         for (i in 1 until prices.size) {
             val price = prices[i]
             val pctFromAnchor = if (anchor != 0.0) abs(price - anchor) / anchor * 100 else 0.0
@@ -100,18 +97,9 @@ object PatternDetector {
         return pivots
     }
 
-    /**
-     * Harmonic Bat pattern (bullish + bearish), using the standard published ratio bands:
-     *   AB retraces XA by 0.382-0.500
-     *   BC retraces AB by 0.382-0.886
-     *   D completes near 0.786-0.886 retracement of XA (the Bat's signature "deep" D point)
-     * X-A-B-C are the last 4 confirmed swing points; D is the current (live) price, since
-     * that is the point the pattern is still forming toward - this flags a potential
-     * reversal zone rather than a confirmed historical pattern.
-     */
     private fun detectBatPattern(prices: List<Double>): Pair<PatternResult, PatternResult> {
         val pivots = findSwingPoints(prices)
-        if (pivots.size < 4) {
+        if (pivots.size < 4 || prices.isEmpty()) {
             return PatternResult(false, 0, "--") to PatternResult(false, 0, "--")
         }
         val n = pivots.size
@@ -146,27 +134,16 @@ object PatternDetector {
 
         return PatternResult(
             bullishFound, bullishScore,
-            if (bullishFound) "Bat D @ ${"%.2f".format(d)}" else "No bull bat"
+            if (bullishFound) "Bat D @ ${String.format(Locale.US, "%.2f", d)}" else "No bull bat"
         ) to PatternResult(
             bearishFound, bearishScore,
-            if (bearishFound) "Bat D @ ${"%.2f".format(d)}" else "No bear bat"
+            if (bearishFound) "Bat D @ ${String.format(Locale.US, "%.2f", d)}" else "No bear bat"
         )
     }
 
-    /**
-     * Harmonic 5-0 pattern (bullish + bearish), using the widely-taught retail ratio bands:
-     *   AB extends XA by 1.13-1.618 (continuation move beyond X)
-     *   BC extends AB by 1.618-2.24 (retracement move beyond A)
-     *   D completes at ~50% retracement of BC (the pattern's signature "50" level)
-     * X-A-B-C are the last 4 confirmed swing points; D is the current (live) price, since
-     * that is the point the pattern is still forming toward - this flags a potential
-     * reversal zone rather than a confirmed historical pattern. Ratio bands are a common
-     * approximation of Scott Carney's harmonic trading rules; tolerances can be tightened
-     * later if false positives show up in practice.
-     */
     private fun detect50Pattern(prices: List<Double>): Pair<PatternResult, PatternResult> {
         val pivots = findSwingPoints(prices)
-        if (pivots.size < 4) {
+        if (pivots.size < 4 || prices.isEmpty()) {
             return PatternResult(false, 0, "--") to PatternResult(false, 0, "--")
         }
         val n = pivots.size
@@ -191,9 +168,7 @@ object PatternDetector {
         val bcOk = bcExt in 1.618..2.24
         val cdOk = cdRetrace in 0.42..0.58
 
-        // Bullish: X-A down, A-B extends further down past X, B-C retraces up, D forming a low
         val bullishShape = x > a && b < x && c > b && d < c
-        // Bearish: X-A up, A-B extends further up past X, B-C retraces down, D forming a high
         val bearishShape = x < a && b > x && c < b && d > c
 
         val bullishFound = bullishShape && abOk && bcOk && cdOk
@@ -204,10 +179,10 @@ object PatternDetector {
 
         return PatternResult(
             bullishFound, bullishScore,
-            if (bullishFound) "5-0 D @ ${"%.2f".format(d)}" else "No bull 5-0"
+            if (bullishFound) "5-0 D @ ${String.format(Locale.US, "%.2f", d)}" else "No bull 5-0"
         ) to PatternResult(
             bearishFound, bearishScore,
-            if (bearishFound) "5-0 D @ ${"%.2f".format(d)}" else "No bear 5-0"
+            if (bearishFound) "5-0 D @ ${String.format(Locale.US, "%.2f", d)}" else "No bear 5-0"
         )
     }
 }
