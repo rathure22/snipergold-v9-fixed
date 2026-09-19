@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -15,10 +14,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import com.snipergold.app.data.Candle
 import com.snipergold.app.ui.theme.GreenBull
 import com.snipergold.app.ui.theme.RedBear
+import java.util.Locale
 
 @Composable
 fun CandleChart(
@@ -28,6 +28,8 @@ fun CandleChart(
     currentPrice: Double,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -36,11 +38,12 @@ fun CandleChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val W = size.width
             val H = size.height
+
             if (candles.size < 2) {
                 drawContext.canvas.nativeCanvas.apply {
                     val paint = android.graphics.Paint().apply {
                         color = android.graphics.Color.parseColor("#64748B")
-                        textSize = 32f
+                        textSize = 14f * density.density
                         isAntiAlias = true
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
@@ -56,11 +59,12 @@ fun CandleChart(
             min -= pad
             max += pad
             val range = (max - min).coerceAtLeast(0.01)
+
             fun py(v: Double) = (H - 20f - ((v - min) / range * (H - 36f)).toFloat())
 
             val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 6f), 0f)
 
-            // Resistance zone (guide high band)
+            // Resistance zone
             val yRes = py(guideHigh)
             drawRect(
                 color = RedBear.copy(alpha = 0.12f),
@@ -69,7 +73,7 @@ fun CandleChart(
             )
             drawLine(RedBear.copy(alpha = 0.7f), Offset(0f, yRes), Offset(W, yRes), 1.5f, pathEffect = dash)
 
-            // Support zone (guide low band)
+            // Support zone
             val ySup = py(guideLow)
             drawRect(
                 color = GreenBull.copy(alpha = 0.12f),
@@ -82,18 +86,21 @@ fun CandleChart(
             drawContext.canvas.nativeCanvas.apply {
                 val pRes = android.graphics.Paint().apply {
                     color = android.graphics.Color.parseColor("#F87171")
-                    textSize = 20f
+                    textSize = 10f * density.density
                     isFakeBoldText = true
                     isAntiAlias = true
                 }
                 val pSup = android.graphics.Paint().apply {
                     color = android.graphics.Color.parseColor("#4ADE80")
-                    textSize = 20f
+                    textSize = 10f * density.density
                     isFakeBoldText = true
                     isAntiAlias = true
                 }
-                drawText("RESISTANCE  ${"%.2f".format(guideHigh)}", 10f, (yRes - 6f).coerceAtLeast(18f), pRes)
-                drawText("SUPPORT  ${"%.2f".format(guideLow)}", 10f, (ySup + 20f).coerceAtMost(H - 6f), pSup)
+                val highText = String.format(Locale.US, "%.2f", guideHigh)
+                val lowText = String.format(Locale.US, "%.2f", guideLow)
+
+                drawText("RESISTANCE  $highText", 10f, (yRes - 6f).coerceAtLeast(18f), pRes)
+                drawText("SUPPORT  $lowText", 10f, (ySup + 20f).coerceAtMost(H - 6f), pSup)
             }
 
             val slot = W / vis.size
@@ -163,11 +170,12 @@ fun CandleChart(
             drawContext.canvas.nativeCanvas.apply {
                 val paint = android.graphics.Paint().apply {
                     color = android.graphics.Color.BLACK
-                    textSize = 24f
+                    textSize = 12f * density.density
                     isFakeBoldText = true
                     isAntiAlias = true
                 }
-                drawText("$${ "%.2f".format(last.close) }", badgeX + 8f, badgeY + 20f, paint)
+                val priceText = String.format(Locale.US, "$%.2f", last.close)
+                drawText(priceText, badgeX + 8f, badgeY + 20f, paint)
             }
         }
     }
